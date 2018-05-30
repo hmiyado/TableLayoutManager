@@ -2,7 +2,6 @@ package com.github.hmiyado.tablelayoutmanager
 
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
-import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 
 class MainActivity : AppCompatActivity() {
@@ -16,7 +15,7 @@ class MainActivity : AppCompatActivity() {
 
         recyclerView = findViewById<RecyclerView>(R.id.recycler_view).also {
             it.adapter = adapter
-            it.layoutManager = LinearLayoutManager(baseContext).also { it.orientation = LinearLayoutManager.VERTICAL }
+            it.layoutManager = TableLayoutManager(baseContext, adapter.row, adapter.column)
         }
     }
 }

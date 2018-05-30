@@ -18,12 +18,12 @@ class Adapter : RecyclerView.Adapter<Adapter.ViewHolder>() {
             .mapIndexed { index, s -> "paragraph $index" to s.split(' ') }
             .toMap()
 
-    private val row: Int
+    val row: Int
         get() {
             return map.mapValues { (_, v) -> v.size }.maxBy { (_, v) -> v }?.value ?: 0
         }
 
-    private val column: Int
+    val column: Int
         get() = map.size
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -35,8 +35,8 @@ class Adapter : RecyclerView.Adapter<Adapter.ViewHolder>() {
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val currentRow = position / column
-        val currentColumn = position % column
+        val currentRow = position % row
+        val currentColumn = position / column
         holder.text = try {
             map.toList()[currentColumn].second.getOrNull(currentRow) ?: "blank"
         } catch (e: IndexOutOfBoundsException) {
