@@ -3,6 +3,7 @@ package com.github.hmiyado.tablelayoutmanager
 import android.content.Context
 import android.support.v7.widget.OrientationHelper
 import android.support.v7.widget.RecyclerView
+import android.util.LayoutDirection
 import android.util.Log
 import android.util.TypedValue
 import android.view.View
@@ -412,6 +413,153 @@ class TableLayoutManager(
         return outOfBoundsMatch ?: return invalidMatch
     }
 
+    override fun scrollHorizontallyBy(
+        dx: Int,
+        recycler: RecyclerView.Recycler?,
+        state: RecyclerView.State?
+    ): Int {
+        recycler ?: return 0
+        state ?: return 0
+        return scrollBy(RecyclerView.HORIZONTAL, dx, recycler, state)
+    }
+
+    override fun scrollVerticallyBy(
+        dy: Int,
+        recycler: RecyclerView.Recycler?,
+        state: RecyclerView.State?
+    ): Int {
+        recycler ?: return 0
+        state ?: return 0
+        return scrollBy(RecyclerView.VERTICAL, dy, recycler, state)
+    }
+
+    private fun scrollBy(
+        orientation: Int,
+        diff: Int,
+        recycler: RecyclerView.Recycler,
+        state: RecyclerView.State
+    ): Int {
+        if (childCount == 0 || diff == 0) {
+            return 0
+        }
+        layoutState.recycle = true
+        val layoutDirection =
+            if (diff > 0) LayoutState.LayoutDirection.END else LayoutState.LayoutDirection.START
+        val absDiff = Math.abs(diff)
+        updateLayoutState(layoutDirection, orientation, absDiff, true, state)
+        val consumed =
+            layoutState.scrollingOffset.apply(fill(recycler, state, layoutState)) { a, b -> a + b }
+        if (consumed.fold { x, y -> x < 0 && y < 0 }) {
+            return 0
+        }
+        val scrolled = when (orientation) {
+            RecyclerView.HORIZONTAL -> {
+                val s = if (absDiff > consumed.x) consumed.x * layoutDirection.diff else diff
+                orientationHelperVector.x.offsetChildren(-s)
+                s
+            }
+            RecyclerView.VERTICAL   -> {
+                val s = if (absDiff > consumed.y) consumed.y * layoutDirection.diff else diff
+                orientationHelperVector.y.offsetChildren(-s)
+                s
+            }
+            else                    -> 0
+        }
+        return scrolled
+    }
+
+    private fun updateLayoutState(
+        layoutDirection: LayoutState.LayoutDirection,
+        orientation: Int,
+        requiredSpace: Int,
+        canUseExistingSpace: Boolean,
+        state: RecyclerView.State
+    ) {
+        val scrollingOffset: Int
+        when (orientation) {
+            RecyclerView.HORIZONTAL -> {
+
+                layoutState.layoutDirection = layoutState.layoutDirection.copy(y = layoutDirection)
+                val view = getChildAt(0)
+                layoutState.currentPosition =
+                        positionToCoordinate(getPosition(view)).let {
+                            val y = it.y + layoutState.layoutDirection.y.diff
+                            val normalizedY = if (y < 0) y + column else y
+                            coordinateToPosition(it.x, normalizedY)
+                        }
+                when (layoutDirection) {
+                    TableLayoutManager.LayoutState.LayoutDirection.START -> {
+                        layoutState.offset =
+                                layoutState.offset.copy(
+                                    y = orientationHelperVector.x.getDecoratedStart(
+                                        view
+                                    )
+                                )
+                        scrollingOffset = orientationHelperVector.x.getDecoratedStart(view) +
+                                orientationHelperVector.x.startAfterPadding
+                    }
+                    TableLayoutManager.LayoutState.LayoutDirection.END   -> {
+                        layoutState.offset =
+                                layoutState.offset.copy(
+                                    y = orientationHelperVector.x.getDecoratedEnd(
+                                        view
+                                    )
+                                )
+                        scrollingOffset = orientationHelperVector.x.getDecoratedEnd(view) -
+                                orientationHelperVector.x.endAfterPadding
+
+                    }
+                }
+                layoutState.availablePixels = layoutState.availablePixels.copy(y = requiredSpace)
+                if (canUseExistingSpace) {
+                    layoutState.availablePixels =
+                            layoutState.availablePixels.copy(y = layoutState.availablePixels.y - scrollingOffset)
+                }
+                layoutState.scrollingOffset = layoutState.scrollingOffset.copy(y = scrollingOffset)
+
+            }
+            RecyclerView.VERTICAL   -> {
+                layoutState.layoutDirection = layoutState.layoutDirection.copy(x = layoutDirection)
+                val view = getChildAt(childCount - 1)
+                layoutState.currentPosition =
+                        positionToCoordinate(getPosition(view)).let {
+                            val x = it.x + layoutState.layoutDirection.x.diff
+                            val normalizedX = if (x < 0) x + row else x
+                            coordinateToPosition(normalizedX, it.y)
+                        }
+                when (layoutDirection) {
+                    TableLayoutManager.LayoutState.LayoutDirection.START -> {
+                        layoutState.offset =
+                                layoutState.offset.copy(
+                                    x = orientationHelperVector.x.getDecoratedStart(
+                                        view
+                                    )
+                                )
+                        scrollingOffset = orientationHelperVector.x.getDecoratedStart(view) +
+                                orientationHelperVector.x.startAfterPadding
+                    }
+                    TableLayoutManager.LayoutState.LayoutDirection.END   -> {
+                        layoutState.offset =
+                                layoutState.offset.copy(
+                                    x = orientationHelperVector.x.getDecoratedEnd(
+                                        view
+                                    )
+                                )
+                        scrollingOffset = orientationHelperVector.x.getDecoratedEnd(view) -
+                                orientationHelperVector.x.endAfterPadding
+
+                    }
+                }
+                layoutState.availablePixels = layoutState.availablePixels.copy(x = requiredSpace)
+                if (canUseExistingSpace) {
+                    layoutState.availablePixels =
+                            layoutState.availablePixels.copy(x = layoutState.availablePixels.y - scrollingOffset)
+                }
+                layoutState.scrollingOffset = layoutState.scrollingOffset.copy(x = scrollingOffset)
+            }
+        }
+    }
+
 
     private class LayoutState {
         enum class ItemDirection {
@@ -428,6 +576,7 @@ class TableLayoutManager(
                 }
         }
 
+        var recycle = false
         var availablePixels = Vector2(0, 0)
         var currentPosition = -1
         val isInfinite = true
